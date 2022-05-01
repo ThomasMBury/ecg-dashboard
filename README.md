@@ -1,7 +1,6 @@
 # Dashboard for analysing multi-day ECG recordings
 
-This code produces an interactive dashboard to analyse multi-day ambulatory 
-ECG recordings (Holter tapes). 
+Code for an interactive dashboard to analyse multi-day ambulatory ECG recordings (Holter tapes). 
 
 ## Launch application
 *link*
