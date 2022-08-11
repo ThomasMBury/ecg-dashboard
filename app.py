@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on 1 May 2022
+Created on April 27, 2022
 
-Dashboard to view ECG recording. Includes:
-	Inter-beat interval time series (RR plot)
-	ECG trace, which shows when user selects a sufficiently small 
-        portion of RR plot
-    Heartprint
-    Phase response plots
-
-To be deployed on Heroku 
+Dash app to stream Physionet ECG data
 
 @author: tbury
 
@@ -20,183 +13,273 @@ import numpy as np
 import pandas as pd
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Input, Output, State
-import dash_auth
+from dash import dcc
+from dash import html
+from dash.dependencies import Input, Output
+
+
+import plotly.express as px
+
+import wfdb
 
 # Import figure functions
 import sys
 import os
-import funs_figures as figs
 
 
-
-def filter_time_range(df, trange):
+def load_ann(record_id, segment_id):
     '''
-    Filter dataframe df to be within trange.
+    Import segment of annotation labels from Icentia11k Physionet.
 
     Parameters
     ----------
-    df : DataFrame
-        dataframe with at least the column 'Time (s)'
-    trange: list
-        list of min and max time (in hours)
+    record_id : int between 0 and 10999
+    segment_id : int between 0 and 49
+        Note not all patients have 50 segments.
 
     Returns
     -------
-    Filtered dataframe
+    df_beats : pd.DataFrame
+        Beat annotations
 
     '''
-    
-    # Convert trange to seconds
-    tmin,tmax = np.array(trange)*60*60
-    
-    # Filter data to be within time range
-    df_out = df[
-        (df['Time (s)']>=tmin)&\
-        (df['Time (s)']<=tmax)].copy()
-    
-    return df_out
+
+    filename = 'p{:05d}_s{:02d}'.format(record_id, segment_id)
+    pn_dir = 'icentia11k-continuous-ecg/1.0/p{:02d}/p{:05d}/'.format(
+        record_id//1000, record_id)
+
+    try:
+        ann = wfdb.rdann(filename, "atr", pn_dir=pn_dir)
+        
+    except:
+        print('File not found for record_id={}, segment={}'.format(record_id,segment_id))
+        return
+
+    df_beats = pd.DataFrame({'sample': ann.sample,
+                            'type': ann.symbol,
+                            'rhythm': ann.aux_note}
+                          )
+    return df_beats
 
 
-def load_record_data(record_id):
+
+def load_ecg(record_id, segment_id, sampfrom, sampto):
     '''
-    Load in record data from the cloud.
-    Best to load in all data whilst app is initalising
-    as opposed to loading within callback functions as this requires
-    saving the data in the users browser which can slow app down.
-    Loading everything upon deployment means the app takes time to initalise,
-    however operations within the app are fast once it is going.
-    
+    Import segment of ECG from Icentia11k Physionet.
+
     Parameters
     ----------
-    record_id : string
-        ID of Holter recording
+    record_id : int between 0 and 10999
+    segment_id : int between 0 and 49
+        Note not all patients have 50 segments.
 
     Returns
     -------
-    df_rr, df_nnavg, df_vv_stats
+    df_ecg : pd.DataFrame
 
     '''
-    
-    # Read in pandas dataframes for beat data
-    df_rr = pd.read_csv(
-        fileroot+'rr_intervals/{}_rr.csv'.format(record_id))
-    df_nnavg = pd.read_csv(
-        fileroot+'nn_avg/{}_nnavg_rw4.csv'.format(record_id)) 
-    df_vv_stats = pd.read_csv(
-        fileroot+'vv_stats/{}_vv_stats.csv'.format(record_id)) 
-    df_vv_stats['Time (s)'] = df_vv_stats['Time start (s)']
-    
-    return df_rr, df_nnavg, df_vv_stats
+
+    filename = 'p{:05d}_s{:02d}'.format(record_id,segment_id)
+    pn_dir = 'icentia11k-continuous-ecg/1.0/p{:02d}/p{:05d}/'.format(
+        record_id//1000, record_id)
+
+    try:
+        signals, fields = wfdb.rdsamp(filename,
+                                      pn_dir=pn_dir,
+                                      sampfrom=sampfrom,
+                                      sampto=sampto,
+                          )
+    except:
+        print('File not found for record_id={}, segment_id={}'.format(record_id,segment_id))
+        df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
+        return df_ecg
+
+    df_ecg = pd.DataFrame({'sample':np.arange(sampfrom, sampto),
+                           'signal':signals[:,0]})
+
+    return df_ecg
 
 
-def get_record_specific_data(record_id, trange):
+
+
+
+# import time
+# start = time.time()
+# df_ecg = load_ecg(0, 0, 0, 250*60*1)
+# # df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
+# fig = make_ecg_plot(df_ecg, include_annotation=True)
+# fig.write_html('temp2.html')
+# end = time.time()
+# print(end-start)
+
+
+
+def get_nib_values(list_labels, verbose=0):
     '''
-    Get record data for specific Holter and specific time range (in hours)
-        
-    Input:
-        record_id: ID for patient
-        trange: [tmin,tmax]
-        
-    Output:
-        df_rr, df_nnavg, df_vv_stats
-    '''   
-    df_rr = filter_time_range(dic_df_rr[record_id], trange)
-    df_nnavg = filter_time_range(dic_df_nnavg[record_id], trange)
-    df_vv_stats = filter_time_range(dic_df_vv_stats[record_id], trange)   
-    # df_vv_stats['Time (s)'] = df_vv_stats['Time start (s)']
-    
-    ## Merge NN avg data 
-    df_rr = df_rr.merge(df_nnavg, on='Time (s)')
-    df_vv_stats = df_vv_stats.merge(df_nnavg, on='Time (s)')
-  
-    return df_rr, df_nnavg, df_vv_stats
+    Compute the NIB values for list of beat annotations list_labels
+
+    A value of -1 means that NIB could not be computed due to interuption from
+    noise values.
+
+    Parameters:
+        list_labels: list of 'N','V','Q','S' corresponding to beats
+
+    '''
+    nib = np.nan
+    count = 0
+    list_nib = []
+
+    for idx, label in enumerate(list_labels):
+
+        if label=='N':
+            nib+=1
+            count+=1
+
+        if label=='V':
+
+            # Convert Nan to -1 to keep all values integers
+            nib = -1 if np.isnan(nib) else nib
+            list_nib.extend([nib]*(count+1))
+
+            # Reset counts
+            nib=0
+            count=0
+
+        if label in ['Q', 'S']:
+            nib=np.nan
+            count+=1
+
+        if verbose:
+            if idx%10000==0:
+                print('Complete for index {}'.format(idx))
+
+    # Add the final labels (must be -1 if remaining)
+    l_remaining = len(list_labels)-len(list_nib)
+    if l_remaining > 0:
+        list_nib.extend([-1]*l_remaining)
+
+    return list_nib
 
 
 
+def compute_rr_nib_nnavg(df_beats):
+    '''
+    Compute RR intervals, NIB values, and NN avg
+    Places into input dataframe and returns
 
-#--------------
-# Import record data
-#–-------------
+    Parameters
+    ----------
+    df_beats : pd.DataFrame
+        Beat annotation labels.
+        Cols ['sample', 'type']
 
+    Returns
+    -------
+    df_beats : pd.DataFrame
 
-# Fileroot on local computer
-fileroot_local='/Users/tbury/Google Drive/Research/postdoc_21_22/ecg-dashboard/data/'
+    '''
 
-# Fileroot on Heroku (check)
-fileroot_cloud='/home/ubuntu/holter_data/ubc_registry/data_output/'
+    #------------
+    # Compute RR intervals
+    #--------------
 
+    # Remove + annotation which indicates rhythm change
+    df_beats = df_beats[df_beats['type'].isin(['N','V','S','Q'])].copy()
 
-# Work out which one to use
-if os.path.isdir(fileroot_local):
-	fileroot = fileroot_local
-	# Boolean to determine if running on cloud or locally
-	run_cloud = False
-else:
-	fileroot = fileroot_cloud
-	run_cloud = True
-
-print('Using data file root {}'.format(fileroot))
-
-
-# list of ID for each patient to include in app
-list_record_id = ['AK6890']
-
-# Initialise dictionaries to store data from all records
-dic_df_rr = {}
-dic_df_nnavg = {}
-dic_df_vv_stats = {}
+    # Compute RR intervals and RR type (NN, NV etc.)
+    df_beats['interval'] = df_beats['sample'].diff()
+    df_beats['type_previous'] = df_beats['type'].shift(1)
+    df_beats['interval_type'] = df_beats['type_previous'] + df_beats['type']
+    df_beats.drop('type_previous', axis=1, inplace=True)
 
 
-# Import data for each record
-print('Begin importing patient data to app')
+    #------------
+    # Compute NN avg over 1 minute intervals
+    # Approximate by the average of all intervals of type NN, NV, VN
+    #----------
 
-# Loop throuh each record ID for this given patient
-for record_id in list_record_id:
-    
-    # Check existence of output data
-    if not os.path.exists(fileroot+'rr_intervals/{}_rr.csv'.format(record_id)):
-        continue
-    
-    # Get beat data specific to this record
-    df_rr, df_nnavg, df_vv_stats = load_record_data(record_id)       
-    
-    # Add data to dictionary
-    dic_df_rr[record_id] = df_rr
-    dic_df_nnavg[record_id] = df_nnavg
-    dic_df_vv_stats[record_id] = df_vv_stats  
-    
-print('Finished importing patient data')
+    df_beats['minute'] = (df_beats['sample']//(250*60)).astype(int)
+
+    df_temp = df_beats[df_beats['interval_type'].isin(['NN','NV','VN'])].copy()
+    # Remove rows that have interval > 2s -  these are due to missing
+    # noise label in data.
+    anomalies = df_temp[df_temp['interval']>2*250].index
+    df_temp = df_temp.drop(anomalies)
+    nn_avg = df_temp.groupby('minute')['interval'].median()
+    nn_avg.name = 'nn_avg'
+    nn_avg = nn_avg.reset_index()
+    df_beats = df_beats.merge(nn_avg, on='minute')
 
 
-## Get markdown (md) file containing app description
-# Filepath on local computer
-desc_filepath_local='/Users/tbury/Google Drive/Research/postdoc_21_22/ecg-dashboard/'
-# Fileroot on cloud
-desc_filepath_cloud='/home/ubuntu/cloud_holter_app/app-holter/'
-# Work out which one to use
-if os.path.isdir(fileroot_local):
-	desc_filepath = desc_filepath_local
-else:
-	desc_filepath = desc_filepath_cloud
-f = open(desc_filepath+'description.md', 'r') 
-description_text = f.read()
-f.close()
+    #-----------
+    # Compute NIB values
+    #-----------
+
+    list_nib = get_nib_values(df_beats['type'], verbose=0)
+    df_beats['nib'] = list_nib
+
+    return df_beats
 
 
 
+def make_rr_plot(df_beats):
 
-#–----------
-# Default settings (executed on initial run)
-#–----------
+    cols = px.colors.qualitative.Plotly
+    color_discrete_map = {'NN':cols[0], 'NV':cols[1],
+                          'VN':cols[2], 'VV':cols[3],
+                          'NN avg':cols[4]}
 
-# Default record ID
-record_id_def = list_record_id[0]
+    df_beats['Time (min)'] = df_beats['sample']/250/60
+    df_beats['interval'] = df_beats['interval']/250
+    df_beats['nn_avg'] = df_beats['nn_avg']/250
 
-# Initial time range of Holter recording
-trange_def = [0,24]
+    df_beats = df_beats[df_beats['interval_type'].isin(['NN','NV','VN','VV'])]
+
+    df_intervals = df_beats[['Time (min)','interval','interval_type']]
+
+    df_nnavg = df_beats[['Time (min)']].copy()
+    df_nnavg['interval'] = df_beats['nn_avg']
+    df_nnavg['interval_type'] = 'NN avg'
+
+    df_plot = pd.concat([df_intervals, df_nnavg])
+
+    fig = px.scatter(df_plot, x='Time (min)', y='interval',
+                     color='interval_type',
+                     color_discrete_map=color_discrete_map)
+
+    fig.update_yaxes(title='Interval (s)')
+    fig.update_layout(margin={'l':80,'r':150,'t':40,'b':30},
+                      height=350,
+                      legend_title_text='Interval type',
+                      )
+    return fig
+
+
+
+def make_ecg_plot(df_ecg, include_annotation=False):
+
+    df_ecg['Time (min)'] = df_ecg['sample']/250/60
+
+    fig = px.line(df_ecg, x='Time (min)', y='signal')
+
+    if include_annotation:
+        fig.add_annotation(x=0.5, y=0.5, xref='x domain', yref='y domain',
+                    text='ECG shows for a selected time window of less than 1 minute',
+                    font=dict(size=20),
+                    showarrow=False,
+                    )
+    fig.update_yaxes(title='Voltage (mV)')
+    fig.update_layout(
+            margin={'l':80,'r':150,'t':40,'b':30},
+            height=350,
+            # title=title,
+            titlefont={'family':'HelveticaNeue','size':18},
+            )
+
+    return fig
+
+
+
 
 
 
@@ -204,80 +287,59 @@ trange_def = [0,24]
 # Launch the dash app
 #---------------
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-print('Launching dash')
 
-server = app.server
+if os.path.isdir('/Users/tbury'):
+    run_cloud=False
+else:
+    run_cloud=True
 
 if run_cloud:
-	app.config.update({  
-	# Change this to directory name used in WSGIAlias
-		'requests_pathname_prefix': '/app-holter-ubc-ecg/',
-	})
-	print('Updated prefix')
+    requests_pathname_prefix = '/app-holter-icentia11k/'
+else:
+    requests_pathname_prefix = '/'
+
+app = dash.Dash(__name__,
+                external_stylesheets=external_stylesheets,
+                requests_pathname_prefix=requests_pathname_prefix
+                )
+
+server = app.server
+print('Launching dash')
 
 
 
-# Dropdown box settings (record_id options are updated in callback fn)
-opts_record_id = [{'label':k,'value':k} for k in list_record_id]
-# Tick marks on time range slider
-time_marks = {int(x):str(x) for x in np.arange(0,180,24)}
+
+# Default record ID
+record_id_def = 0
+segment_id_def = 0
+
+# Import default data
+df_ann = load_ann(record_id_def, 0)
+df_rr = compute_rr_nib_nnavg(df_ann)
+df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
 
 
-#-----------------
-# Create figures
-#-----------------
-
-# Set RR range
-rr_range=[0.25,2.25]
-
-
-# Static figure titles
-title_rr = 'Beat-to-beat interval plot'
-title_ecg = 'ECG trace (displays for time intervals < 0.1hr)'
-
-
-# Get record specific data for default values
-df_rr, df_nnavg, df_vv_stats = \
-    get_record_specific_data(record_id_def,
-                         trange_def,
-                         )
-
-# hookup_time = df_record_IDs[\
-#    df_record_IDs['Record ID']==record_ID_def]['Start time (hr)'].values[0]
-
-    
-##----------- Interval plot--------------
-fig_rr = figs.make_rr_plot_express(df_rr,
-                                   rr_range=rr_range,
-                                   title=title_rr,
-                                   fixedrange=True,
-)
-
-#-----------ECG plot---------------
-filepath_ecg = fileroot+'ecg_signals/{}_signal_data'.format(str(record_id))
-fig_ecg = figs.make_ecg_plot(filepath_ecg, trange_def[0]*3600, trange_def[1]*3600,
-                             title=title_ecg)
-
+# Make figures
+fig_rr = make_rr_plot(df_rr)
+fig_ecg = make_ecg_plot(df_ecg, include_annotation=True)
 
 
 #--------------------
 # App layout
 #–-------------------
 
-
 # Font sizes
 size_title = '20px'
 
 app.layout = \
     html.Div([
-        
-    
+
+
         # Title section of app
         html.Div(
             [
 
-            html.H4('ECG dashboard analysis',
+            html.H4('Icentia11k Holter recordings',
                     style={
                         # 'textAlign':'center',
                         # 'fontSize':26,
@@ -285,7 +347,7 @@ app.layout = \
                         }
             ),
             ],
-            
+
             style={'width':'30%',
                     'height':'60px',
                     'fontSize':'10px',
@@ -294,75 +356,76 @@ app.layout = \
                     'padding-bottom':'10px',
                     'padding-top':'30px',
                     'vertical-align': 'middle',
-                    'display':'inline-block'}, 
-            
+                    'display':'inline-block'},
+
         ),
-        
+
         # Dropdown menu for record_id
         html.Div(
             [
-            
+
             # Label
             html.Label('Record ID',
                        style={'fontSize':14}
             ),
-             
+
             dcc.Dropdown(id='dropdown_record_id',
-                         options=opts_record_id,
+                         options=np.arange(11000),
                          value=record_id_def,
                          optionHeight=20,
-                         searchable=False,
-                         clearable=False
+                         clearable=True,
             ),
-            
+
             ],
-                        
-            style={'width':'20%',
+
+            style={'width':'15%',
                    'height':'60px',
                    'fontSize':'14px',
-                   'padding-left':'0%',
+                   'padding-left':'1%',
                    'padding-right':'0%',
                    'padding-bottom':'10px',
                    'padding-top':'30px',
                    'vertical-align': 'middle',
-                   'display':'inline-block'},       
+                   'display':'inline-block'},
         ),
-           
-        
-        # Slider for time range
+
+
+
+        # Dropdown menu for segment_id
         html.Div(
             [
-            # Slider for time range
-            html.Label('Time range (hrs)',
-                        id='trange_slider_text',
-                        style={'fontSize':14},
-            ),  
-            
-            dcc.RangeSlider(
-                    id='trange_slider',
-                    min=0,
-                    max=180,
-                    step=1,
-                    marks= time_marks,
-                    value=trange_def,
+
+            # Label
+            html.Label('Segment ID',
+                       style={'fontSize':14}
             ),
+
+            dcc.Dropdown(id='dropdown_segment_id',
+                         options=np.arange(50),
+                         value=segment_id_def,
+                         optionHeight=20,
+                         # searchable=False,
+                          clearable=True
+            ),
+
             ],
-            
-            style={'width':'25%',
-               'height':'60px',
-               'fontSize':'10px',
-               'padding-left':'5%',
-               'padding-right':'0%',
-               'padding-bottom':'10px',
-               'padding-top':'30px',
-               'vertical-align': 'middle',
-               'display':'inline-block'},               
+
+            style={'width':'15%',
+                   'height':'60px',
+                   'fontSize':'14px',
+                   'padding-left':'1%',
+                   'padding-right':'0%',
+                   'padding-bottom':'10px',
+                   'padding-top':'30px',
+                   'vertical-align': 'middle',
+                   'display':'inline-block'},
         ),
-    
-    
+
+
+
         # Loading animation
         html.Div(
-            [       
+            [
             dcc.Loading(
                 id="loading-anim",
                 type="default",
@@ -380,32 +443,10 @@ app.layout = \
                 'vertical-align': 'middle',
                 'display':'inline-block',
                 },
-                
-        ),   
-   
-   
-    
-        
-        # Text on tips for usage
-        html.Div(
-            [
-            dcc.Markdown(description_text)
-            ],
-  
-            style={'width':'30%',
-                'height':'60px',
-                'fontSize':'12px',
-                'padding-left':'5%',
-                'padding-right':'5%',
-                'padding-bottom':'0px',
-                'padding-top':'0px',
-                # 'vertical-align': 'middle',
-                'display':'inline-block',
-                },               
-        ),
-        
 
-    
+        ),
+
+
         # Interval plot layout
         html.Div(
             [
@@ -414,9 +455,9 @@ app.layout = \
                        config={'doubleClick': 'autosize'}
                        )
             ],
-            
+
             style={'width':'98%',
-                   'height':'350px',
+                   'height':'300px',
                    'fontSize':'10px',
                    'padding-left':'1%',
                    'padding-right':'1%',
@@ -425,30 +466,8 @@ app.layout = \
                    'vertical-align': 'middle',
                    'display':'inline-block'},
         ),
-    
-#       Loading animation 2
-        html.Div(
-            [       
-            dcc.Loading(
-                id="loading-anim2",
-                type="default",
-                children=html.Div(id="loading-output2")
-            ),
-            ],
-            style={'width':'10%',
-                'height':'40px',
-                'fontSize':'12px',
-                'padding-left':'90%',
-                'padding-right':'0%',
-                'padding-bottom':'0px',
-                'padding-top':'0px',
-                'vertical-align': 'middle',
-                'display':'inline-block',
-                },
-                
-        ),       
-           
-        
+
+
         # ECG plot layout
         html.Div(
             [
@@ -457,25 +476,25 @@ app.layout = \
                        config={'doubleClick': 'autosize'}
                        )
             ],
-            
+
             style={'width':'98%',
-                   'height':'350px',
+                   'height':'270px',
                    'fontSize':'10px',
                    'padding-left':'1%',
                    'padding-right':'1%',
-                   'padding-top' : '0px',
-                   'padding-bottom':'20px',
+                   'padding-top' : '40px',
+                   'padding-bottom':'0px',
                    'vertical-align': 'middle',
                    'display':'inline-block'},
-        ),        
-        
-        
+        ),
+
+
         # Footer
         html.Footer(
             [
                 'Created and maintained by ',
             html.A('Thomas Bury',
-                   href='http://thomas-bury.research.mcgill.ca/', 
+                   href='http://thomas-bury.research.mcgill.ca/',
                    target="_blank",
                    ),
             ],
@@ -484,127 +503,119 @@ app.layout = \
                                # 'horizontal-align':'middle',
                               'textAlign':'center',
                    },
-                    
+
             ),
-        
-        
 ])
-        
+
 
 #–-------------------
 # Callback functions
 #–--------------------
 
 
-
-# Update data upon change record ID or time range
+# Update data upon change of record_id or segment_id
 @app.callback(
-    [Output('rr_plot','figure'),
-     Output('loading-output','children'), 
-     ],
     [
-     Input('dropdown_record_id','value'),
-     Input('trange_slider','value'),
-     ],
+     Output('rr_plot','figure'),
+     # Output('ecg_plot','figure'),
+      Output('loading-output','children'),
+      ],
+    [
+      Input('dropdown_record_id','value'),
+      Input('dropdown_segment_id','value'),
+      ],
 )
 
-
-def update_patient(record_id_adjusted, trange_adjusted):
+def modify_record(record_id_mod, segment_id_mod):
     '''
     Update dataframes based on change in dropdown box and slider
-    
-    '''
-    # Load in new data
-    df_rr_update, df_nnavg_update, df_vv_stats_update =\
-        get_record_specific_data(record_id_adjusted, trange_adjusted)
 
-    # Update interval plot
-    fig_rr = figs.make_rr_plot_express(df_rr_update,
-                                       rr_range=rr_range,
-                                       title=title_rr,
-                                       fixedrange=True,
-    )
-    
+    '''
+
+    # If dropdown box was cleared, don't do anything
+    if (record_id_mod is None) or (segment_id_mod is None):
+        raise dash.exceptions.PreventUpdate()
+
+    # Import new data
+    df_ann = load_ann(record_id_mod, segment_id_mod)
+    df_rr = compute_rr_nib_nnavg(df_ann)
+
+    fig_rr = make_rr_plot(df_rr)
+
     return [fig_rr,
-            # fig_ecg,
-            # fig_24hour_stats,
             '',
             ]
-    
-    
-# Update stats figures based on change in interval plot selection     
+
+
+
 @app.callback(
-        [Output('ecg_plot','figure'),
-         Output('loading-output2','children'),
+        [
+        Output('ecg_plot','figure'),
           ],
-        [Input('rr_plot','relayoutData'),
-         Input('dropdown_record_id','value'),
-         Input('trange_slider','value'),
-          ],
+        [
+        Input('rr_plot','relayoutData'),
+        Input('dropdown_record_id','value'), # we need these to import correct ECG data
+        Input('dropdown_segment_id','value')
+        ],
 )
 
-def update_stat_figures(layout_data, record_id, trange):
-    
-    #–--------Determine new values for tmin and tmax to display stats data-------#
-    
+def modify_time_window(relayout_data, record_id, segment_id):
+
     # ctx provides info on which input was triggered
     ctx = dash.callback_context
-    
+
     # If layout_data was triggered
     # print (ctx.triggered[0])
     if ctx.triggered[0]['prop_id'] == 'rr_plot.relayoutData':
-    
-	    if layout_data==None:
-		    layout_data={}
-	
-		# If neither bound has been changed (due to a click on other button) don't do anything
-	    if ('xaxis.range[0]' not in layout_data) and ('xaxis.range[1]' not in layout_data) and ('xaxis.autorange' not in layout_data):
-		    raise dash.exceptions.PreventUpdate()
 
 
-		# If range has been auto-ranged
-	    if 'xaxis.autorange' in layout_data:
-		    tmin_adjust = trange[0]
-		    tmax_adjust = trange[1]
 
-		# If lower bound has been changed
-	    if ('xaxis.range[0]' in layout_data):
-		    # Adjusted lower bound
-		    tmin_adjust = layout_data['xaxis.range[0]']
-		    # If lower than lower bound, use tmin
-		    tmin_adjust = max(trange[0],tmin_adjust)
-	    else:
-		    tmin_adjust = trange[0]
-	   
-		# If upper bound has been changed
-	    if ('xaxis.range[1]' in layout_data):
-			# Adjusted upper bound
-		    tmax_adjust = layout_data['xaxis.range[1]']
-			# If higher than higher bound, use tmax
-		    tmax_adjust = min(trange[1],tmax_adjust)
-	    else:
-		    tmax_adjust = trange[1]
-    
-    # If recordID or trange was triggered
+        if relayout_data==None:
+            relayout_data={}
+
+        # If neither bound has been changed (due to a click on other button) don't do anything
+        if ('xaxis.range[0]' not in relayout_data) and ('xaxis.range[1]' not in relayout_data) and ('xaxis.autorange' not in relayout_data):
+            raise dash.exceptions.PreventUpdate()
+
+
+        # If range has been auto-ranged
+        if 'xaxis.autorange' in relayout_data:
+            tmin_adjust = 0
+            tmax_adjust = 60
+
+        # If lower bound has been changed
+        if ('xaxis.range[0]' in relayout_data):
+            tmin_adjust = relayout_data['xaxis.range[0]']
+        else:
+            tmin_adjust = 0
+
+        # If upper bound has been changed
+        if ('xaxis.range[1]' in relayout_data):
+            # Adjusted upper bound
+            tmax_adjust = relayout_data['xaxis.range[1]']
+        else:
+            tmax_adjust = 60
+
+    # If record_id or segment_id were triggered
     else:
-        tmin_adjust = trange[0]
-        tmax_adjust = trange[1]
-    
-    
-    # # Get adjusted stat data
-    # df_rr_select, df_nnavg_select, df_vv_stats_select = \
-    #     get_record_specific_data(record_id,np.array([tmin_adjust,tmax_adjust]))
+        tmin_adjust = 0
+        tmax_adjust = 60
 
 
-    # Update ECG plot
-    filepath_ecg = fileroot+'ecg_signals/{}_signal_data'.format(str(record_id))
-    fig_ecg = figs.make_ecg_plot(filepath_ecg, tmin_adjust*3600, tmax_adjust*3600,
-                                 title=title_ecg)
-    
-    # Return new plots
-    return [fig_ecg,
-            '',
-            ]
+    # If time window < 1 min, then import ECG data
+    if tmax_adjust - tmin_adjust < 1:
+
+        sampfrom = int(tmin_adjust*60*250)
+        sampto = int(tmax_adjust*60*250)
+        df_ecg = load_ecg(record_id, segment_id, sampfrom, sampto)
+        # Make figure
+        fig_ecg = make_ecg_plot(df_ecg)
+
+    else:
+        df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
+        fig_ecg = make_ecg_plot(df_ecg, include_annotation=True)
+
+    return [fig_ecg]
 
 
 
@@ -613,7 +624,7 @@ def update_stat_figures(layout_data, record_id, trange):
 #–-----------------
 
 if run_cloud:
-    host='206.12.93.144'
+    host='206.12.98.131'
 else:
     host='127.0.0.1'
 
@@ -621,6 +632,3 @@ if __name__ == '__main__':
     app.run_server(debug=True,
                    host=host,
                    )
-    
-    
-    
