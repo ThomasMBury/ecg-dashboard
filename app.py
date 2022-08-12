@@ -3,11 +3,15 @@
 """
 Created on April 27, 2022
 
-Dash app to stream Physionet ECG data
+Dash app to stream and visulaise the ECG and annotation data
+from the Icentia11k database on Physionet located here
+https://www.physionet.org/content/icentia11k-continuous-ecg/1.0/
 
-@author: tbury
+
+@author: Thomas M. Bury
 
 """
+
 
 import numpy as np
 import pandas as pd
@@ -16,7 +20,6 @@ import dash
 from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output
-
 
 import plotly.express as px
 

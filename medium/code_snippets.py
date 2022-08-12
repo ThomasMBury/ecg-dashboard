@@ -33,28 +33,31 @@ record_id = 24
 segment_id = 3
 
 
-def load_ann(record_id, segment_id):
+def load_beats(record_id, segment_id, sampfrom, sampto):
     
+    # name and path to data stored on Physionet
     filename = 'p{:05d}_s{:02d}'.format(record_id, segment_id)
-    pn_dir = 'icentia11k-continuous-ecg/1.0/p{:02d}/p{:05d}/'.format(
-        record_id//1000, record_id)
+    pn_dir_root = 'icentia11k-continuous-ecg/1.0/'
+    pn_dir = 'p{:02d}/p{:05d}/'.format(record_id//1000, record_id)
 
-    ann = wfdb.rdann(filename, "atr", pn_dir=pn_dir)
-
+    ann = wfdb.rdann(filename, "atr", 
+                     pn_dir=pn_dir_root+pn_dir,
+                     sampfrom=sampfrom,
+                     sampto=sampto
+                     )
+    
     df_beats = pd.DataFrame({'sample': ann.sample,
-                             'type': ann.symbol,
-                             'rhythm': ann.aux_note}
+                             'type': ann.symbol}
                             )
     return df_beats
 
 
-
 def load_ecg(record_id, segment_id, sampfrom, sampto):
-
-    filename = 'p{:05d}_s{:02d}'.format(record_id,segment_id)
+    
+    # name and path to data stored on Physionet
+    filename = 'p{:05d}_s{:02d}'.format(record_id, segment_id)
     pn_dir_root = 'icentia11k-continuous-ecg/1.0/'
     pn_dir = 'p{:02d}/p{:05d}/'.format(record_id//1000, record_id)
-
     signals, fileds = wfdb.rdsamp(filename,
                                   pn_dir=pn_dir_root+pn_dir,
                                   sampfrom=sampfrom,
@@ -68,31 +71,78 @@ def load_ecg(record_id, segment_id, sampfrom, sampto):
 
 
 
+
 def make_ecg_plot(df_ecg):
     
-    # Make a column for time elapsed in minutes
+    # Make a column for time in minutes
     df_ecg['Time (min)'] = df_ecg['sample']/250/60
     
-    fig = px.line(df_ecg, x='Time (min)', y='signal')
-    fig.update_yaxes(title='Voltage (mV)')
-    fig.update_layout(
-            margin={'l':80,'r':150,'t':40,'b':30},
-            height=350,
-            titlefont={'family':'HelveticaNeue','size':18},
-            )
-
+    fig = px.line(df_ecg,
+                  x='Time (min)', 
+                  y='signal',
+                  labels={'signal':'Voltage (mV)'},
+                  height=350)
+    
     return fig
 
 
 
 
+def make_beat_interval_plot(df_beats):
+
+    # Make a column for time in minutes
+    df_beats['Time (min)'] = df_beats['sample']/250/60
+    
+    # Make column for time interval between beats
+    df_beats['Interval (s)'] = (df_beats['sample'] 
+                                - df_beats['sample'].shift(1))
+    
+    # Make column for type of interval
+    df_beats['Interval Type'] = (df_beats['type'].shift(1)
+                                 + df_beats['type'])
+    
+    # Only consider intervals between N and V beats (NN, NV, VN or VV)
+    df_beats = df_beats[
+        df_beats['Interval Type'].isin(['NN','NV','VN','VV'])]
+    df_beats = df_beats.dropna()
+    
+    # Assign colours to each interval type
+    cols = px.colors.qualitative.Plotly
+    color_discrete_map = dict(zip(['NN','NV','VN','VV'], cols[:4]))
+
+    fig = px.scatter(df_beats, 
+                     x='Time (min)', 
+                     y='Interval (s)',
+                     color='Interval Type',
+                     color_discrete_map=color_discrete_map,
+                     height=350
+                     )    
+    
+    return fig
 
 
-df = load_ecg(1234, 1, 0, 1000)
-df.set_index('sample').plot()
+
+
+# df = load_ecg(1234, 1, 0, 1000)
+# df.set_index('sample').plot()
 
 
 
+# Good section to use for figs in text
+record_id = 18
+segment_id = 0
+sampfrom = 2*250*60
+sampto = 3*250*60
+
+df_beats = load_beats(record_id, segment_id, sampfrom, sampto)
+df_ecg = load_ecg(record_id, segment_id, sampfrom, sampto)
+
+
+fig = make_beat_interval_plot(df_beats)
+fig.write_html('temp1.html')
+
+fig = make_ecg_plot(df_ecg)
+fig.write_html('temp2.html')
 
 
 
