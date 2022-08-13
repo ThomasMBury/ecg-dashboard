@@ -18,6 +18,8 @@ from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output
 
+import matplotlib.pyplot as plt
+
 
 import plotly.express as px
 
@@ -29,8 +31,9 @@ import os
 
 
 
-record_id = 24
-segment_id = 3
+record_id = 0
+segment_id = 0
+sampto=0
 
 
 def load_beats(record_id, segment_id, sampfrom, sampto):
@@ -58,14 +61,16 @@ def load_ecg(record_id, segment_id, sampfrom, sampto):
     filename = 'p{:05d}_s{:02d}'.format(record_id, segment_id)
     pn_dir_root = 'icentia11k-continuous-ecg/1.0/'
     pn_dir = 'p{:02d}/p{:05d}/'.format(record_id//1000, record_id)
-    signals, fileds = wfdb.rdsamp(filename,
+    signals, fields = wfdb.rdsamp(filename,
                                   pn_dir=pn_dir_root+pn_dir,
                                   sampfrom=sampfrom,
                                   sampto=sampto
                                   )
     
-    df_ecg = pd.DataFrame({'sample': np.arange(sampfrom, sampto),
-                           'signal': signals[:,0]})
+    df_ecg = pd.DataFrame(
+        {'sample': np.arange(sampfrom, sampfrom+len(signals)),
+         'signal': signals[:,0]}
+        )
     
     return df_ecg
 
@@ -123,10 +128,6 @@ def make_beat_interval_plot(df_beats):
 
 
 
-# df = load_ecg(1234, 1, 0, 1000)
-# df.set_index('sample').plot()
-
-
 
 # Good section to use for figs in text
 record_id = 18
@@ -146,6 +147,16 @@ fig.write_html('temp2.html')
 
 
 
+
+
+# #-------------
+# # 'Wall of ink' ECG figure
+# #-------------
+# df_ecg = load_ecg(0, 0, 0, 1*60*60*250)
+# df_ecg['Time (hr)'] = df_ecg['sample']/250/60/60
+# df_ecg.set_index('Time (hr)', inplace=True)
+# df_ecg['signal'].plot()
+# plt.ylabel('Voltage (mV)')
 
 
 
