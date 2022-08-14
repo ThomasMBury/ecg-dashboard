@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.express as px
 import wfdb
 
-from dash import Dash, html, dcc
+from dash import Dash, html, dcc, exceptions
 from dash.dependencies import Input, Output
 
 css = 'https://codepen.io/chriddyp/pen/bWLwgP.css'
@@ -171,20 +171,70 @@ fig_ecg = make_ecg_plot(df_ecg)
 
 app.layout = html.Div([
     # List all components of app here
-    html.H1('ECG Dashboard'),
+    
+    html.Div(
+        html.H4('ECG dashboard'),
+        style={'width':'200px',
+               'height':'60px',
+               'padding-left':'2%',
+               'display':'inline-block',
+               }),
+
+    html.Div([
+        html.Label('Record ID'),
+        dcc.Dropdown(id='dropdown_record_id',
+                     value=record_id_def,
+                     options=np.arange(11000),
+                     clearable=False)
+        ],
+        style={'width':'20%',
+               'height':'60px',
+               'padding-left':'2%',
+               'display':'inline-block',
+               }),        
+
+    html.Div([
+        html.Label('Segment ID'),
+        dcc.Dropdown(id='dropdown_segment_id',
+                     value=segment_id_def,
+                     options=np.arange(50),
+                     clearable=False)
+        ],
+        style={'width':'20%',
+               'height':'60px',
+               'padding-left':'2%',
+               'display':'inline-block',
+               }),     
+    
     html.Div(
         dcc.Graph(id='fig_intervals', figure=fig_intervals),
-        style={'width':'98%',
-               'height':'300px',
-               },
-    ),
-    html.Div(
-        dcc.Graph(id='fig_ecg', figure=fig_ecg),
-        style={'width':'98%',
-               'height':'300px',
-               },
     ),
 ])
+
+
+
+# Update data upon change of record_id or segment_id
+@app.callback(
+     Output('fig_intervals','figure'),
+     Input('dropdown_record_id','value'),
+     Input('dropdown_segment_id','value')
+)
+
+def change_record(record_id_mod, segment_id_mod):
+    
+    df_beats = load_beats(record_id_mod, segment_id_mod)
+    fig_intervals = make_interval_plot(df_beats)
+
+    return fig_intervals
+
+
+
+
+
+
+
+
+
 
 #################################
 

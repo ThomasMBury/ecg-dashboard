@@ -366,13 +366,9 @@ app.layout = \
 
 # Update data upon change of record_id or segment_id
 @app.callback(
-    [
      Output('fig_intervals','figure'),
-      ],
-    [
-      Input('dropdown_record_id','value'),
-      Input('dropdown_segment_id','value'),
-      ],
+     Input('dropdown_record_id','value'),
+     Input('dropdown_segment_id','value')
 )
 
 def modify_record(record_id_mod, segment_id_mod):
@@ -389,20 +385,16 @@ def modify_record(record_id_mod, segment_id_mod):
     df_beats = load_beats(record_id_mod, segment_id_mod)
     fig_intervals = make_interval_plot(df_beats)
 
-    return [fig_intervals]
+    return fig_intervals
 
 
 
 @app.callback(
-        [
         Output('fig_ecg','figure'),
-          ],
-        [
         Input('fig_intervals','relayoutData'),
         Input('dropdown_record_id','value'), # we need these to import correct ECG data
-        Input('dropdown_segment_id','value')
-        ],
-)
+        Input('dropdown_segment_id','value'),
+        )
 
 def modify_time_window(relayout_data, record_id, segment_id):
 
@@ -460,7 +452,7 @@ def modify_time_window(relayout_data, record_id, segment_id):
         df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
         fig_ecg = make_ecg_plot(df_ecg, include_annotation=True)
 
-    return [fig_ecg]
+    return fig_ecg
 
 
 
