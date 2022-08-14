@@ -1,4 +1,4 @@
-# Dashboard for analysing multi-day ECG recordings
+# Dashboard for exploring ECG data on Physionet
 
 Code for an interactive dashboard to analyse multi-day ambulatory ECG recordings (Holter tapes). 
 
