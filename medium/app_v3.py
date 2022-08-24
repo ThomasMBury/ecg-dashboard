@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.express as px
 import wfdb
 
-from dash import Dash, html, dcc, exceptions
+from dash import Dash, html, dcc, exceptions, callback_context
 from dash.dependencies import Input, Output
 
 css = 'https://codepen.io/chriddyp/pen/bWLwgP.css'
@@ -132,7 +132,7 @@ def make_interval_plot(df_beats):
     return fig
 
 
-def make_ecg_plot(df_ecg, include_annotation=False):
+def make_ecg_plot(df_ecg):
     
     # Make a column for time in minutes
     df_ecg['Time (min)'] = df_ecg['sample']/250/60
@@ -144,7 +144,8 @@ def make_ecg_plot(df_ecg, include_annotation=False):
                   labels={'signal':'Voltage (mV)'},
                   height=300)
     
-    if include_annotation:
+    # If dataframe is empty
+    if len(df_ecg)==0:
         fig.add_annotation(x=0.5, y=0.5, xref='x domain', yref='y domain',
                     text='ECG shows for a selected time window of less than 1 minute',
                     font=dict(size=20),
@@ -159,7 +160,7 @@ def make_ecg_plot(df_ecg, include_annotation=False):
 record_id_def = 0
 segment_id_def = 0
 
-df_beats = load_beats(record_id_def, 0)
+df_beats = load_beats(record_id_def, segment_id_def)
 df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
 
 fig_intervals = make_interval_plot(df_beats)
@@ -213,20 +214,84 @@ app.layout = html.Div([
 
 
 
-# Update data upon change of record_id or segment_id
+
 @app.callback(
      Output('fig_intervals','figure'),
      Input('dropdown_record_id','value'),
      Input('dropdown_segment_id','value')
 )
-
-def change_record(record_id_mod, segment_id_mod):
+def update_record(record_id, segment_id):
     
-    df_beats = load_beats(record_id_mod, segment_id_mod)
+    df_beats = load_beats(record_id, segment_id)
     fig_intervals = make_interval_plot(df_beats)
-
+    
     return fig_intervals
 
+
+
+@app.callback(
+        Output('fig_ecg','figure'),
+        Input('fig_intervals','relayoutData'),
+        Input('dropdown_record_id','value'), # we need these to import correct ECG data
+        Input('dropdown_segment_id','value'),
+        )
+
+def update_ecg_plot(relayout_data, record_id, segment_id):
+
+    # ctx provides info on which input was triggered
+    ctx = callback_context
+
+    # If layout_data was triggered
+    # print (ctx.triggered[0])
+    if ctx.triggered[0]['prop_id'] == 'fig_intervals.relayoutData':
+
+
+
+        if relayout_data==None:
+            relayout_data={}
+
+        # If neither bound has been changed (due to a click on other button) don't do anything
+        if ('xaxis.range[0]' not in relayout_data) and ('xaxis.range[1]' not in relayout_data) and ('xaxis.autorange' not in relayout_data):
+            raise exceptions.PreventUpdate()
+
+        # If range has been auto-ranged
+        if 'xaxis.autorange' in relayout_data:
+            tmin_adjust = 0
+            tmax_adjust = 60
+
+        # If lower bound has been changed
+        if ('xaxis.range[0]' in relayout_data):
+            tmin_adjust = relayout_data['xaxis.range[0]']
+        else:
+            tmin_adjust = 0
+
+        # If upper bound has been changed
+        if ('xaxis.range[1]' in relayout_data):
+            # Adjusted upper bound
+            tmax_adjust = relayout_data['xaxis.range[1]']
+        else:
+            tmax_adjust = 60
+
+    # If record_id or segment_id were triggered
+    else:
+        tmin_adjust = 0
+        tmax_adjust = 60
+
+
+    # If time window < 1 min, then import ECG data
+    if tmax_adjust - tmin_adjust < 1:
+
+        sampfrom = int(tmin_adjust*60*250)
+        sampto = int(tmax_adjust*60*250)
+        df_ecg = load_ecg(record_id, segment_id, sampfrom, sampto)
+        # Make figure
+        fig_ecg = make_ecg_plot(df_ecg)
+
+    else:
+        df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
+        fig_ecg = make_ecg_plot(df_ecg)
+
+    return fig_ecg
 
 
 
