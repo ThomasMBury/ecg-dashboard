@@ -11,13 +11,12 @@ import pandas as pd
 import plotly.express as px
 import wfdb
 
-from dash import Dash, html, dcc
+from dash import Dash, html, dcc, exceptions, callback_context
 from dash.dependencies import Input, Output
 
 css = 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 app = Dash(__name__, external_stylesheets=[css])
 server = app.server
-
 
 def load_beats(record_id, segment_id, sampfrom, sampto):
     
@@ -127,26 +126,41 @@ fig_intervals = make_beat_interval_plot(df_beats)
 fig_ecg = make_ecg_plot(df_ecg)
 
 
+
 #################################
 # App details go in here
 
 app.layout = html.Div([
     # List all components of app here
-    html.H1('ECG Dashboard'),
-    
+    html.Div(
+        html.H4('ECG dashboard'),
+        style={'width':'200px',
+               'height':'60px',
+               'padding-left':'2%',
+               'display':'inline-block',
+               }),
+
     html.Div([
         html.Label('Record ID'),
         dcc.Dropdown(id='dropdown_record_id',
                      value=record_id_def,
-                     options=np.arange(11000))
-    ]),
-    
+                     options=np.arange(11000))],
+        style={'width':'20%',
+               'height':'60px',
+               'padding-left':'2%',
+               'display':'inline-block',
+               }),        
+
     html.Div([
         html.Label('Segment ID'),
         dcc.Dropdown(id='dropdown_segment_id',
-                     options=np.arange(50),
-                     value=segment_id_def)
-    ]),
+                     value=segment_id_def,
+                     options=np.arange(50))],
+        style={'width':'20%',
+               'height':'60px',
+               'padding-left':'2%',
+               'display':'inline-block',
+               }),     
     
     html.Div(
         dcc.Graph(id='fig_intervals', figure=fig_intervals),
@@ -156,6 +170,96 @@ app.layout = html.Div([
         dcc.Graph(id='fig_ecg', figure=fig_ecg),    
         )
 ])
+
+
+
+
+@app.callback(
+     Output('fig_intervals','figure'),
+     Input('dropdown_record_id','value'),
+     Input('dropdown_segment_id','value')
+)
+def update_record(record_id, segment_id):
+    
+    # If dropdown box was cleared, don't do anything
+    if (record_id is None) or (segment_id is None):
+        raise exceptions.PreventUpdate()
+    
+    df_beats = load_beats(record_id, segment_id, 0, None)
+    fig_intervals = make_beat_interval_plot(df_beats)
+    
+    return fig_intervals
+
+
+
+@app.callback(
+        Output('fig_ecg','figure'),
+        Input('fig_intervals','relayoutData'),
+        Input('dropdown_record_id','value'), # we need these to import correct ECG data
+        Input('dropdown_segment_id','value'),
+        )
+
+def update_ecg_plot(relayout_data, record_id, segment_id):
+
+    # ctx provides info on which input was triggered
+    ctx = callback_context
+
+    # If layout_data was triggered
+    # print (ctx.triggered[0])
+    if ctx.triggered[0]['prop_id'] == 'fig_intervals.relayoutData':
+
+
+
+        if relayout_data==None:
+            relayout_data={}
+
+        # If neither bound has been changed (due to a click on other button) don't do anything
+        if ('xaxis.range[0]' not in relayout_data) and ('xaxis.range[1]' not in relayout_data) and ('xaxis.autorange' not in relayout_data):
+            raise exceptions.PreventUpdate()
+
+        # If range has been auto-ranged
+        if 'xaxis.autorange' in relayout_data:
+            tmin_adjust = 0
+            tmax_adjust = 60
+
+        # If lower bound has been changed
+        if ('xaxis.range[0]' in relayout_data):
+            tmin_adjust = relayout_data['xaxis.range[0]']
+        else:
+            tmin_adjust = 0
+
+        # If upper bound has been changed
+        if ('xaxis.range[1]' in relayout_data):
+            # Adjusted upper bound
+            tmax_adjust = relayout_data['xaxis.range[1]']
+        else:
+            tmax_adjust = 60
+
+    # If record_id or segment_id were triggered
+    else:
+        tmin_adjust = 0
+        tmax_adjust = 60
+
+
+    # If time window < 1 min, then import ECG data
+    if tmax_adjust - tmin_adjust < 1:
+
+        sampfrom = int(tmin_adjust*60*250)
+        sampto = int(tmax_adjust*60*250)
+        df_ecg = load_ecg(record_id, segment_id, sampfrom, sampto)
+        # Make figure
+        fig_ecg = make_ecg_plot(df_ecg)
+
+    else:
+        df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
+        fig_ecg = make_ecg_plot(df_ecg)
+
+    return fig_ecg
+
+
+
+
+
 
 #################################
 
