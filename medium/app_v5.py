@@ -193,53 +193,51 @@ def update_record(record_id, segment_id):
 
 
 @app.callback(
-        Output('fig_ecg','figure'),
-        Input('fig_intervals','relayoutData'),
-        Input('dropdown_record_id','value'), # we need these to import correct ECG data
-        Input('dropdown_segment_id','value'),
-        )
+    Output('fig_ecg','figure'),
+    Input('fig_intervals','relayoutData'),
+    Input('dropdown_record_id','value'),
+    Input('dropdown_segment_id','value'),
+    )
 
 def update_ecg_plot(relayout_data, record_id, segment_id):
 
-    # ctx provides info on which input was triggered
+    # callback_context provides info on which input was triggered
     ctx = callback_context
 
     # If layout_data was triggered
-    # print (ctx.triggered[0])
     if ctx.triggered[0]['prop_id'] == 'fig_intervals.relayoutData':
-
-
 
         if relayout_data==None:
             relayout_data={}
 
-        # If neither bound has been changed (due to a click on other button) don't do anything
-        if ('xaxis.range[0]' not in relayout_data) and ('xaxis.range[1]' not in relayout_data) and ('xaxis.autorange' not in relayout_data):
+        # If neither bound has changed (other button may have been clicked)
+        # then prevent update
+        if ('xaxis.range[0]' not in relayout_data) and \
+           ('xaxis.range[1]' not in relayout_data) and \
+           ('xaxis.autorange' not in relayout_data):
             raise exceptions.PreventUpdate()
 
-        # If range has been auto-ranged
+        # If auto-range button has been clicked
         if 'xaxis.autorange' in relayout_data:
             tmin_adjust = 0
             tmax_adjust = 60
 
-        # If lower bound has been changed
+        # If lower bound has been updated
         if ('xaxis.range[0]' in relayout_data):
             tmin_adjust = relayout_data['xaxis.range[0]']
         else:
             tmin_adjust = 0
 
-        # If upper bound has been changed
+        # If upper bound has been updated
         if ('xaxis.range[1]' in relayout_data):
-            # Adjusted upper bound
             tmax_adjust = relayout_data['xaxis.range[1]']
         else:
             tmax_adjust = 60
 
-    # If record_id or segment_id were triggered
+    # If record_id or segment_id were triggered, reset ECG
     else:
         tmin_adjust = 0
         tmax_adjust = 60
-
 
     # If time window < 1 min, then import ECG data
     if tmax_adjust - tmin_adjust < 1:
@@ -247,10 +245,12 @@ def update_ecg_plot(relayout_data, record_id, segment_id):
         sampfrom = int(tmin_adjust*60*250)
         sampto = int(tmax_adjust*60*250)
         df_ecg = load_ecg(record_id, segment_id, sampfrom, sampto)
-        # Make figure
+        
+        # Make ECG figure
         fig_ecg = make_ecg_plot(df_ecg)
 
     else:
+        # Make empty ECG figure
         df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
         fig_ecg = make_ecg_plot(df_ecg)
 

@@ -2,3 +2,6 @@ data/
 medium_dev/
 .DS_Store
 *temp*
+venv
+*.pyc
+.env

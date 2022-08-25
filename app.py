@@ -25,9 +25,6 @@ import plotly.express as px
 
 import wfdb
 
-# Import figure functions
-import sys
-import os
 
 
 
