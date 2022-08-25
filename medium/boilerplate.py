@@ -18,7 +18,7 @@ server = app.server
 
 app.layout = html.Div([
     # List all components of app here
-    html.H1('ECG Dashboard'),
+    html.H1('My Dashboard'),
 ])
 
 #################################
