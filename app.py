@@ -452,15 +452,12 @@ def modify_time_window(relayout_data, record_id, segment_id):
     return fig_ecg
 
 
-
 #-----------------
 # Add the server clause
 #–-----------------
 
 
-app.run_server(debug=True,
-               host='127.0.0.1',
-               )
+app.run_server(debug=True)
     
     
     
