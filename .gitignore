@@ -3,3 +3,4 @@ medium_dev/
 venv
 *.pyc
 .env
+.DS_Store
