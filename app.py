@@ -26,8 +26,6 @@ import plotly.express as px
 import wfdb
 
 
-
-
 def load_beats(record_id, segment_id, sampfrom=0, sampto=None):
     '''
     Import segment of annotation labels from Icentia11k Physionet.
@@ -65,7 +63,6 @@ def load_beats(record_id, segment_id, sampfrom=0, sampto=None):
                                  'type': ann.symbol}
                             )
     return df_beats
-
 
 
 def load_ecg(record_id, segment_id, sampfrom, sampto):
@@ -106,10 +103,6 @@ def load_ecg(record_id, segment_id, sampfrom, sampto):
         )
 
     return df_ecg
-
-
-
-
 
 
 
@@ -196,163 +189,118 @@ fig_intervals = make_interval_plot(df_beats)
 fig_ecg = make_ecg_plot(df_ecg)
 
 
-#--------------------
-# App layout
-#–-------------------
+#################################
+# App details go in here
 
-# Font sizes
-size_title = '20px'
+app.layout = html.Div([
 
-app.layout = \
-    html.Div([
+    # List all components of app here
 
+    # Title
+    html.Div(
+        html.H4('ECG dashboard',
+                style={'color':'black'}
+        ),
+        style={'width':'200px',
+                'height':'60px',
+                'fontSize':'10px',
+                'padding-left':'2%',
+                'padding-right':'0%',
+                'padding-bottom':'10px',
+                'padding-top':'30px',
+                'vertical-align': 'middle',
+                'display':'inline-block'},
 
-        # Title section of app
-        html.Div(
-            [
+    ),
 
-            html.H4('Icentia11k Holter recordings',
-                    style={
-                        # 'textAlign':'center',
-                        # 'fontSize':26,
-                        'color':'black',
-                        }
-            ),
-            ],
+    # Dropdown menu for record_id
+    html.Div(
+        [
 
-            style={'width':'30%',
-                    'height':'60px',
-                    'fontSize':'10px',
-                    'padding-left':'2%',
-                    'padding-right':'0%',
-                    'padding-bottom':'10px',
-                    'padding-top':'30px',
-                    'vertical-align': 'middle',
-                    'display':'inline-block'},
-
+        # Label
+        html.Label('Record ID',
+                   style={'fontSize':14}
         ),
 
-        # Dropdown menu for record_id
-        html.Div(
-            [
-
-            # Label
-            html.Label('Record ID',
-                       style={'fontSize':14}
-            ),
-
-            dcc.Dropdown(id='dropdown_record_id',
-                         options=np.arange(11000),
-                         value=record_id_def,
-                         optionHeight=20,
-                         clearable=True,
-            ),
-
-            ],
-
-            style={'width':'15%',
-                   'height':'60px',
-                   'fontSize':'14px',
-                   'padding-left':'1%',
-                   'padding-right':'0%',
-                   'padding-bottom':'10px',
-                   'padding-top':'30px',
-                   'vertical-align': 'middle',
-                   'display':'inline-block'},
+        dcc.Dropdown(id='dropdown_record_id',
+                     options=np.arange(11000),
+                     value=record_id_def,
+                     optionHeight=20,
+                     clearable=True,
         ),
 
+        ],
+
+        style={'width':'20%',
+               'height':'60px',
+               'fontSize':'14px',
+               'padding-left':'1%',
+               'padding-right':'0%',
+               'padding-bottom':'10px',
+               'padding-top':'30px',
+               'vertical-align': 'middle',
+               'display':'inline-block'},
+    ),
 
 
-        # Dropdown menu for segment_id
-        html.Div(
-            [
 
-            # Label
-            html.Label('Segment ID',
-                       style={'fontSize':14}
-            ),
+    # Dropdown menu for segment_id
+    html.Div(
+        [
 
-            dcc.Dropdown(id='dropdown_segment_id',
-                         options=np.arange(50),
-                         value=segment_id_def,
-                         optionHeight=20,
-                         # searchable=False,
-                          clearable=True
-            ),
-
-            ],
-
-            style={'width':'15%',
-                   'height':'60px',
-                   'fontSize':'14px',
-                   'padding-left':'1%',
-                   'padding-right':'0%',
-                   'padding-bottom':'10px',
-                   'padding-top':'30px',
-                   'vertical-align': 'middle',
-                   'display':'inline-block'},
+        # Label
+        html.Label('Segment ID',
+                   style={'fontSize':14}
         ),
 
-
-
-        # Interval plot layout
-        html.Div(
-            [
-                dcc.Graph(id='fig_intervals',
-                       figure = fig_intervals,
-                       config={'doubleClick': 'autosize'}
-                       )
-            ],
-
-            style={'width':'98%',
-                   'height':'300px',
-                   'fontSize':'10px',
-                   'padding-left':'1%',
-                   'padding-right':'1%',
-                   'padding-top' : '40px',
-                   'padding-bottom':'0px',
-                   'vertical-align': 'middle',
-                   'display':'inline-block'},
+        dcc.Dropdown(id='dropdown_segment_id',
+                     options=np.arange(50),
+                     value=segment_id_def,
+                     optionHeight=20,
+                     # searchable=False,
+                      clearable=True
         ),
 
+        ],
 
-        # ECG plot layout
-        html.Div(
-            [
-                dcc.Graph(id='fig_ecg',
-                       figure = fig_ecg,
-                       config={'doubleClick': 'autosize'}
-                       )
-            ],
+        style={'width':'20%',
+               'height':'60px',
+               'fontSize':'14px',
+               'padding-left':'1%',
+               'padding-right':'0%',
+               'padding-bottom':'10px',
+               'padding-top':'30px',
+               'vertical-align': 'middle',
+               'display':'inline-block'},
+    ),
 
-            style={'width':'98%',
-                   'height':'270px',
-                   'fontSize':'10px',
-                   'padding-left':'1%',
-                   'padding-right':'1%',
-                   'padding-top' : '40px',
-                   'padding-bottom':'0px',
-                   'vertical-align': 'middle',
-                   'display':'inline-block'},
+
+    # Interval plot
+    html.Div(
+        dcc.Graph(id='fig_intervals', figure=fig_intervals),
         ),
+    
+    # ECG plot
+    html.Div(
+        dcc.Graph(id='fig_ecg', figure=fig_ecg),    
+        ),
+    
+    # Footer
+    html.Footer(
+        [
+            'Source code ',
+        html.A('here',
+               href='https://github.com/ThomasMBury/ecg-dashboard',
+               target="_blank",
+               ),
+        ],
+        style={'padding-top':'40px',
+               'fontSize':'15px',
+               'width':'100%',
+               'textAlign':'center',
+               },
 
-
-        # Footer
-        html.Footer(
-            [
-                'Source code',
-            html.A('here',
-                   href='https://github.com/ThomasMBury/ecg-dashboard',
-                   target="_blank",
-                   ),
-            ],
-            style={'fontSize':'15px',
-                              'width':'100%',
-                               # 'horizontal-align':'middle',
-                              'textAlign':'center',
-                   },
-
-            ),
+        ),
 ])
 
 
