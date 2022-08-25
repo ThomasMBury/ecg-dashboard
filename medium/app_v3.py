@@ -103,7 +103,7 @@ def make_ecg_plot(df_ecg):
     
     if len(df_ecg)==0:
         fig.add_annotation(x=0.5, y=0.5, xref='x domain', yref='y domain',
-                    text='ECG shows for a selected time window of less than 1 minute',
+                    text='Corresponding ECG for time windows < 1 minute',
                     font=dict(size=20),
                     showarrow=False,
                     )   
