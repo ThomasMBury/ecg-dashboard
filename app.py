@@ -456,8 +456,8 @@ def modify_time_window(relayout_data, record_id, segment_id):
 # Add the server clause
 #–-----------------
 
-
-app.run_server(debug=True)
+if __name__ == '__main__':
+    app.run_server(debug=True)
     
     
     
