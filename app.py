@@ -136,6 +136,7 @@ def make_interval_plot(df_beats):
                      height=300
                      )    
     fig.update_layout(margin={'l':80,'r':150,'t':40,'b':0})
+    fig.update_yaxes(fixedrange=True)
     
     return fig
 
