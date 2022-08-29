@@ -1,14 +1,23 @@
 # Dashboard for exploring ECG data on Physionet
 
-Code for an interactive dashboard to analyse multi-day ambulatory ECG recordings (Holter tapes). 
+This repository contains code to genereate an interactive dashboard to view ECG data from the [Icentia11k](https://physionet.org/content/icentia11k-continuous-ecg/1.0/) database on Physionet. It accompanies the Medium article published [here](https://medium.com/p/c748588e2920/edit).
 
-## Launch application
-*link*
+## Running the app locally
 
-## Background
-With modern wearable devices such as the [Icentia CardioSTAT](https://www.cardiostat.com/), patients can seamlessly record a continuous, multi-day ECG recording as they go about their daily lives. With a sample rate of 250Hz, a 2-week recording consists of over 300 million datapoints. With a large cohort of patients to analyse, this becomes an unprecedented amount of data. Dashboards provide an excellent way to interactively view and analyse large datasets. Here, we have created a dashboard using [Plotly Dash](https://dash.plotly.com/) to analyse these long ECG recordings. We showcase it here, with patient data from the [Icentia11k](https://physionet.org/content/icentia11k-continuous-ecg/1.0/) database.
+To run the app on your local computer, clone the repository, create a virtual environment and install the necessary requirements with
 
-## Details of analysis
+`pip install --upgrade pip`
+`pip install -r requirements`
 
+Then run the app with
 
+`python app.py`
 
+## Medium files
+
+To follow along with the Medium article, there are several versions of the app at different stages of completion in the [medium](./medium) directory. These can be run with e.g.
+
+`cd medium`
+`python app_v1.py`
+
+If you cannot access the Medium article, there is pdf version [here](./medium/article.pdf).
