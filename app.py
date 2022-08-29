@@ -141,26 +141,26 @@ def make_interval_plot(df_beats):
     return fig
 
 
-def make_ecg_plot(df_ecg, include_annotation=False):
+def make_ecg_plot(df_ecg):
     
     # Make a column for time in minutes
     df_ecg['Time (min)'] = df_ecg['sample']/250/60
     
- 
     fig = px.line(df_ecg,
                   x='Time (min)', 
                   y='signal',
                   labels={'signal':'Voltage (mV)'},
                   height=300)
     
-    if include_annotation:
+    if len(df_ecg)==0:
         fig.add_annotation(x=0.5, y=0.5, xref='x domain', yref='y domain',
                     text='Corresponding ECG for time windows < 1 minute',
                     font=dict(size=20),
                     showarrow=False,
-                    )    
+                    )   
+        
     fig.update_layout(margin={'l':80,'r':150,'t':40,'b':30})
-    
+
     return fig
 
 
@@ -396,7 +396,7 @@ def modify_time_window(relayout_data, record_id, segment_id):
 
     else:
         df_ecg = pd.DataFrame({'sample':[], 'signal':[]})
-        fig_ecg = make_ecg_plot(df_ecg, include_annotation=True)
+        fig_ecg = make_ecg_plot(df_ecg)
 
     return fig_ecg
 
