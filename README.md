@@ -1,6 +1,7 @@
-# Dashboard for exploring ECG data on Physionet
+# Building a dashboard in Plotly Dash
 
-This repository contains code to genereate an interactive dashboard to view ECG data from the [Icentia11k](https://physionet.org/content/icentia11k-continuous-ecg/1.0/) database on Physionet. It accompanies the Medium article published [here](https://medium.com/p/c748588e2920/edit).
+Generate an interactive dashboard to explore ECG data from the [Icentia11k](https://physionet.org/content/icentia11k-continuous-ecg/1.0/) database on Physionet. It accompanies this [Medium article](https://medium.com/p/c748588e2920/edit). The app is currently hosted on Heroku [here](https://ecg-dashboard-medium.herokuapp.com/).
+
 
 ## Running the app locally
 
@@ -36,4 +37,9 @@ If you cannot access the Medium article, there is pdf version [here](./medium/ar
 
 ## Usage
 
-Feel free to use and extend this template for your own use. If you find it useful, please consider 'clapping' the [medium article](https://medium.com/p/c748588e2920/edit) and starring this repository. Thank you!
+Feel free to use and extend this template for your own use. If you find it useful, please consider 'clapping' the [Medium article](https://medium.com/p/c748588e2920/edit) and starring this repository. Thank you!
+
+## Preview
+
+<img width="1164" alt="app" src="https://user-images.githubusercontent.com/36854425/187282440-138884a1-f473-4f8d-a8ff-54e1f197f31b.png">
+
