@@ -33,8 +33,6 @@ cd medium
 python app_v1.py
 ```
 
-If you cannot access the Medium article, there is pdf version [here](./medium/article.pdf).
-
 ## Usage
 
 Feel free to use and extend this template for your own use. If you find it useful, please consider 'clapping' the [Medium article](https://medium.com/p/c748588e2920/edit) and starring this repository. Thank you!
