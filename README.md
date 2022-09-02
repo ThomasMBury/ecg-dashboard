@@ -41,7 +41,7 @@ Feel free to use and extend this template for your own use. If you find it usefu
 
 <img width="1164" alt="app" src="https://user-images.githubusercontent.com/36854425/187282440-138884a1-f473-4f8d-a8ff-54e1f197f31b.png">
 
-## Citations
+## References
 
 Tan, S., Ortiz-Gagné, S., Beaudoin-Gagnon, N., Fecteau, P., Courville, A., Bengio, Y., & Cohen, J. P. (2022). Icentia11k Single Lead Continuous Raw Electrocardiogram Dataset (version 1.0). PhysioNet. https://doi.org/10.13026/kk0v-r952.
 
