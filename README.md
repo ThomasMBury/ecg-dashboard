@@ -41,3 +41,9 @@ Feel free to use and extend this template for your own use. If you find it usefu
 
 <img width="1164" alt="app" src="https://user-images.githubusercontent.com/36854425/187282440-138884a1-f473-4f8d-a8ff-54e1f197f31b.png">
 
+## Citations
+
+Tan, S., Ortiz-Gagné, S., Beaudoin-Gagnon, N., Fecteau, P., Courville, A., Bengio, Y., & Cohen, J. P. (2022). Icentia11k Single Lead Continuous Raw Electrocardiogram Dataset (version 1.0). PhysioNet. https://doi.org/10.13026/kk0v-r952.
+
+Goldberger, A., Amaral, L., Glass, L., Hausdorff, J., Ivanov, P. C., Mark, R., ... & Stanley, H. E. (2000). PhysioBank, PhysioToolkit, and PhysioNet: Components of a new research resource for complex physiologic signals. Circulation [Online]. 101 (23), pp. e215–e220.
+
